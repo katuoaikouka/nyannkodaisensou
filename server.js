@@ -1,29 +1,33 @@
 const express = require('express');
-const Unblocker = require('unblocker');
+const cors_proxy = require('cors-anywhere');
 const path = require('path');
 const app = express();
 
-// Unblockerの設定
-// prefix: '/proxy/' 以降のパスをプロキシとして処理します
-const unblocker = new Unblocker({
-    prefix: '/proxy/'
+// CORS Anywhereのサーバー作成
+const proxy = cors_proxy.createServer({
+    originWhitelist: [], // 全てのオリジンを許可
+    requireHeader: [],    // 特定のヘッダーを要求しない
+    removeHeaders: [
+        'cookie',
+        'cookie2',
+        'x-frame-options',
+        'content-security-policy',
+        'x-webkit-csp'
+    ]
 });
 
-// ミドルウェアの登録
-app.use(unblocker);
+// プロキシのメインロジック
+app.get('/proxy/:url*', (req, res) => {
+    req.url = req.url.replace('/proxy/', '/');
+    proxy.emit('request', req, res);
+});
 
-// ルートアクセス時に説明を表示（または後述のindex.htmlを表示）
+// トップページ
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Renderなどのホスティング環境ではプロセスが提供するPORTを使用する
 const port = process.env.PORT || 3000;
-
-const server = app.listen(port, () => {
-    console.log(`Proxy server is running on port ${port}`);
-    console.log(`URL format: http://localhost:${port}/proxy/https://www.google.com`);
+app.listen(port, () => {
+    console.log(`CORS Proxy running on port ${port}`);
 });
-
-// WebSocket (upgrade) リクエストに対応（必要なサイト用）
-server.on('upgrade', unblocker.onUpgrade);
